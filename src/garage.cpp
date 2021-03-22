@@ -38,10 +38,12 @@ struct Input {
     operator bool() const { return get(); }
 };
 
+Input<D7, true> button;
+Input<D1, true> sensor_open;
+Input<D2, true> sensor_closed;
+
 Output<D5, true> relay_door;
 Output<D6, true> relay_light;
-
-Input<D7, true> button;
 
 void setup() {
     red_led.init();
@@ -53,6 +55,10 @@ void setup() {
     relay_door.init();
     relay_light.init();
 
+    button.init();
+    sensor_open.init();
+    sensor_closed.init();
+
     wifi_control.init();
 
     red_led.set_pattern(0b1110);
@@ -61,6 +67,18 @@ void setup() {
 void loop() {
     wifi_control.tick();
     red_led.tick();
+
+    if (sensor_open) {
+        if (sensor_closed)
+            red_led.set_pattern(0b1);
+        else
+            red_led.set_pattern(0b1000);
+    } else {
+        if (sensor_closed)
+            red_led.set_pattern(0b1110);
+        else
+            red_led.set_pattern(0b0);
+    }
 
     relay_door = button;
     relay_light = !button;
