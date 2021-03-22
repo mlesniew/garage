@@ -20,8 +20,23 @@ struct Output {
     }
 };
 
+template <uint8_t pin, bool inverted = false>
+struct Input {
+    void init() {
+        pinMode(pin, INPUT);
+    }
+
+    bool get() const {
+        return (digitalRead(pin) == HIGH) != inverted;
+    }
+
+    operator bool() const { return get(); }
+};
+
 Output<D5, true> relay_door;
 Output<D6, true> relay_light;
+
+Input<D7, true> button;
 
 void setup() {
     red_led.init();
@@ -42,7 +57,6 @@ void loop() {
     wifi_control.tick();
     red_led.tick();
 
-    const auto t = millis() / 1000;
-    relay_door.set(t % 3 == 0);
-    relay_light.set(t % 5 == 0);
+    relay_door.set(button);
+    relay_light.set(!button);
 }
