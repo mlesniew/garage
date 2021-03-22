@@ -18,6 +18,11 @@ struct Output {
     void set(bool value) {
         digitalWrite(pin, value != inverted);
     }
+
+    Output<pin, inverted> & operator=(const bool value) {
+        set(value);
+        return *this;
+    }
 };
 
 template <uint8_t pin, bool inverted = false>
@@ -57,6 +62,6 @@ void loop() {
     wifi_control.tick();
     red_led.tick();
 
-    relay_door.set(button);
-    relay_light.set(!button);
+    relay_door = button;
+    relay_light = !button;
 }
