@@ -3,6 +3,12 @@
 #include <utils/led.h>
 #include <utils/wifi_control.h>
 
+#define HOSTNAME "Garage"
+
+#ifndef PASSWORD
+#define PASSWORD "secret-" __TIME__
+#endif
+
 BlinkingLed blue_led(D4, 0, 91, true);
 BlinkingLed red_led(D3, 0, 123, true);
 
@@ -50,7 +56,7 @@ void setup() {
     red_led.set_pattern(0);
 
     Serial.begin(9600);
-    Serial.println(F("Garage " __DATE__ " " __TIME__));
+    Serial.println(F(HOSTNAME " " __DATE__ " " __TIME__));
 
     relay_door.init();
     relay_light.init();
@@ -59,7 +65,12 @@ void setup() {
     sensor_open.init();
     sensor_closed.init();
 
-    wifi_control.init();
+    if (button) {
+        Serial.println(F("Starting conifg AP, ssid: " HOSTNAME " password: " PASSWORD));
+        wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, HOSTNAME, PASSWORD);
+    } else {
+        wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, HOSTNAME, PASSWORD);
+    }
 
     red_led.set_pattern(0b1110);
 }
