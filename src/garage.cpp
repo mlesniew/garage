@@ -1,15 +1,12 @@
 #include <Arduino.h>
+#include <ArduinoOTA.h>
 #include <ESP8266WebServer.h>
 #include <LittleFS.h>
 
 #include <PicoUtils.h>
 
-#define HOSTNAME "garage"
-
-#ifndef PASSWORD
-#define PASSWORD "secret-" __TIME__
-#endif
-
+String hostname = "garage";
+String password = "secret-" __TIME__;
 
 PicoUtils::PinOutput wifi_led(D4, true);
 PicoUtils::Blink wifi_led_blinker(wifi_led, 0, 91);
@@ -25,7 +22,7 @@ PicoUtils::PinOutput relay_door(D5, true);
 PicoUtils::PinOutput relay_light(D6, true);
 
 void setup_wifi() {
-    WiFi.hostname(HOSTNAME);
+    WiFi.hostname(hostname);
     WiFi.setAutoReconnect(true);
 
     Serial.println(F("Press button now to enter SmartConfig."));
@@ -74,7 +71,7 @@ void setup() {
     wifi_led_blinker.set_pattern(0b10);
 
     Serial.begin(9600);
-    Serial.println(F(HOSTNAME " " __DATE__ " " __TIME__));
+    Serial.println(F("Garage " __DATE__ " " __TIME__));
 
     red_led_blinker.init();
     red_led_blinker.set_pattern(0);
@@ -86,6 +83,13 @@ void setup() {
     setup_wifi();
 
     red_led_blinker.set_pattern(0b1110);
+
+    Serial.println(F("Starting up ArduinoOTA..."));
+    ArduinoOTA.setHostname(hostname.c_str());
+    if (password.length()) {
+        ArduinoOTA.setPassword(password.c_str());
+    }
+    ArduinoOTA.begin();
 
     Serial.println(F("Setup complete."));
 }
