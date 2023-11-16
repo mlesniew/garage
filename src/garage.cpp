@@ -104,15 +104,17 @@ void loop() {
     update_wifi_led();
 
     if (sensor_open) {
-        if (sensor_closed)
+        if (sensor_closed) {
             red_led_blinker.set_pattern(0b1);
-        else
+        } else {
             red_led_blinker.set_pattern(0b1000);
+        }
     } else {
-        if (sensor_closed)
+        if (sensor_closed) {
             red_led_blinker.set_pattern(0b1110);
-        else
+        } else {
             red_led_blinker.set_pattern(0b0);
+        }
     }
 
     relay_door.set(button);
