@@ -1,96 +1,120 @@
 #include <Arduino.h>
+#include <ESP8266WebServer.h>
+#include <LittleFS.h>
 
-#include <utils/led.h>
-#include <utils/wifi_control.h>
+#include <PicoUtils.h>
 
-#define HOSTNAME "Garage"
+#define HOSTNAME "garage"
 
 #ifndef PASSWORD
 #define PASSWORD "secret-" __TIME__
 #endif
 
-BlinkingLed blue_led(D4, 0, 91, true);
-BlinkingLed red_led(D3, 0, 123, true);
 
-WiFiControl wifi_control(blue_led);
+PicoUtils::PinOutput wifi_led(D4, true);
+PicoUtils::Blink wifi_led_blinker(wifi_led, 0, 91);
 
-template <uint8_t pin, bool inverted>
-struct Output {
-    void init(const bool initial_state = false) {
-        pinMode(pin, OUTPUT);
-        set(initial_state);
+PicoUtils::PinOutput red_led(D3, true);
+PicoUtils::Blink red_led_blinker(red_led, 0, 123);
+
+PicoUtils::PinInput button(D7, true);
+PicoUtils::PinInput sensor_open(D1, true);
+PicoUtils::PinInput sensor_closed(D2, true);
+
+PicoUtils::PinOutput relay_door(D5, true);
+PicoUtils::PinOutput relay_light(D6, true);
+
+void setup_wifi() {
+    WiFi.hostname(HOSTNAME);
+    WiFi.setAutoReconnect(true);
+
+    Serial.println(F("Press button now to enter SmartConfig."));
+    wifi_led_blinker.set_pattern(1);
+    const PicoUtils::Stopwatch stopwatch;
+    bool smart_config = false;
+    {
+        while (!smart_config && (stopwatch.elapsed_millis() < 3 * 1000)) {
+            smart_config = button;
+            delay(100);
+        }
     }
 
-    void set(bool value) {
-        digitalWrite(pin, value != inverted);
+    if (smart_config) {
+        wifi_led_blinker.set_pattern(0b100100100 << 9);
+
+        Serial.println(F("Entering SmartConfig mode."));
+        WiFi.beginSmartConfig();
+        while (!WiFi.smartConfigDone() && (stopwatch.elapsed_millis() < 5 * 60 * 1000)) {
+            delay(100);
+        }
+
+        if (WiFi.smartConfigDone()) {
+            Serial.println(F("SmartConfig success."));
+        } else {
+            Serial.println(F("SmartConfig failed.  Reboot."));
+            ESP.reset();
+        }
+    } else {
+        WiFi.softAPdisconnect(true);
+        WiFi.begin();
     }
 
-    Output<pin, inverted> & operator=(const bool value) {
-        set(value);
-        return *this;
-    }
-};
-
-template <uint8_t pin, bool inverted = false>
-struct Input {
-    void init() {
-        pinMode(pin, INPUT);
-    }
-
-    bool get() const {
-        return (digitalRead(pin) == HIGH) != inverted;
-    }
-
-    operator bool() const { return get(); }
-};
-
-Input<D7, true> button;
-Input<D1, true> sensor_open;
-Input<D2, true> sensor_closed;
-
-Output<D5, true> relay_door;
-Output<D6, true> relay_light;
+    wifi_led_blinker.set_pattern(0b10);
+}
 
 void setup() {
-    red_led.init();
-    red_led.set_pattern(0);
+    relay_door.init();
+    relay_door.set(false);
+
+    relay_light.init();
+    relay_light.set(false);
+
+    wifi_led_blinker.init();
+    PicoUtils::BackgroundBlinker bb(wifi_led_blinker);
+    wifi_led_blinker.set_pattern(0b10);
 
     Serial.begin(9600);
     Serial.println(F(HOSTNAME " " __DATE__ " " __TIME__));
 
-    relay_door.init();
-    relay_light.init();
+    red_led_blinker.init();
+    red_led_blinker.set_pattern(0);
 
     button.init();
     sensor_open.init();
     sensor_closed.init();
 
-    if (button) {
-        Serial.println(F("Starting conifg AP, ssid: " HOSTNAME " password: " PASSWORD));
-        wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, HOSTNAME, PASSWORD);
-    } else {
-        wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, HOSTNAME, PASSWORD);
-    }
+    setup_wifi();
 
-    red_led.set_pattern(0b1110);
+    red_led_blinker.set_pattern(0b1110);
+
+    Serial.println(F("Setup complete."));
 }
 
+void update_wifi_led() {
+    if (WiFi.status() == WL_CONNECTED) {
+        wifi_led_blinker.set_pattern(uint64_t(0b1) << 60);
+    } else {
+        wifi_led_blinker.set_pattern(0b1100);
+    }
+    wifi_led_blinker.tick();
+};
+
 void loop() {
-    wifi_control.tick();
-    red_led.tick();
+    red_led_blinker.tick();
+    update_wifi_led();
 
     if (sensor_open) {
         if (sensor_closed)
-            red_led.set_pattern(0b1);
+            red_led_blinker.set_pattern(0b1);
         else
-            red_led.set_pattern(0b1000);
+            red_led_blinker.set_pattern(0b1000);
     } else {
         if (sensor_closed)
-            red_led.set_pattern(0b1110);
+            red_led_blinker.set_pattern(0b1110);
         else
-            red_led.set_pattern(0b0);
+            red_led_blinker.set_pattern(0b0);
     }
 
-    relay_door = button;
-    relay_light = !button;
+    relay_door.set(button);
+    relay_light.set(!button);
 }
