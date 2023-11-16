@@ -21,6 +21,14 @@ PicoUtils::PinInput sensor_closed(D2, true);
 PicoUtils::PinOutput relay_door(D5, true);
 PicoUtils::PinOutput relay_light(D6, true);
 
+PicoUtils::RestfulServer<ESP8266WebServer> server;
+
+void activate_door() {
+    relay_door.set(true);
+    delay(500);
+    relay_door.set(false);
+}
+
 void setup_wifi() {
     WiFi.hostname(hostname);
     WiFi.setAutoReconnect(true);
@@ -59,6 +67,14 @@ void setup_wifi() {
     wifi_led_blinker.set_pattern(0b10);
 }
 
+void setup_endpoints() {
+    server.on("/activate", HTTP_POST, [] {
+        Serial.printf("POST %s\n", server.uri().c_str());
+        activate_door();
+        server.send(200);
+    });
+}
+
 void setup() {
     relay_door.init();
     relay_door.set(false);
@@ -84,6 +100,10 @@ void setup() {
 
     red_led_blinker.set_pattern(0b1110);
 
+    Serial.println(F("Setting up web server..."));
+    setup_endpoints();
+    server.begin();
+
     Serial.println(F("Starting up ArduinoOTA..."));
     ArduinoOTA.setHostname(hostname.c_str());
     if (password.length()) {
@@ -107,6 +127,8 @@ void loop() {
     red_led_blinker.tick();
     update_wifi_led();
 
+    server.handleClient();
+
     if (sensor_open) {
         if (sensor_closed) {
             red_led_blinker.set_pattern(0b1);
@@ -120,7 +142,4 @@ void loop() {
             red_led_blinker.set_pattern(0b0);
         }
     }
-
-    relay_door.set(button);
-    relay_light.set(!button);
 }
